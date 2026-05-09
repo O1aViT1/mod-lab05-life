@@ -179,45 +179,37 @@ namespace cli_life
                 Console.Write('\n');
             }
         }
+        
+public static void RunResearch()
+{
+    Directory.CreateDirectory("Data");
+    string text = "";
 
-        public static void RunResearch()
+    for (double d = 0.1; d <= 0.9; d += 0.1)
+    {
+        int total = 0;
+        for (int i = 0; i < 5; i++)
         {
-            Directory.CreateDirectory("../Data");
-            string data = "";
-
-            for (double density = 0.1; density <= 0.9; density += 0.1)
+            Board b = new Board(50, 20, 1, d);
+            int g = 0, sc = 0, last = 0;
+            while (sc < 15 && g < 1000)
             {
-                int totalGenerations = 0;
-                int attempts = 5;
-
-                for (int a = 0; a < attempts; a++)
-                {
-                    Board b = new Board(50, 20, 1, density);
-                    int gens = 0;
-                    int sameCount = 0;
-                    int lastAlive = 0;
-
-                    while (sameCount < 15 && gens < 1000)
-                    {
-                        b.Advance();
-                        int currentAlive = 0;
-                        foreach (var cell in b.Cells) if (cell.IsAlive) currentAlive++;
-                        
-                        if (currentAlive == lastAlive) sameCount++;
-                        else sameCount = 0;
-
-                        lastAlive = currentAlive;
-                        gens++;
-                    }
-                    totalGenerations += (gens - 15);
-                }
-                data += $"{density:F1} {totalGenerations / (double)attempts}\n";
-                Console.WriteLine($"Плотность {density:F1}: {totalGenerations / (double)attempts} пок.");
+                b.Advance();
+                int cur = 0;
+                foreach (var c in b.Cells) if (c.IsAlive) cur++;
+                if (cur == last) sc++; else sc = 0;
+                last = cur; g++;
             }
-            File.WriteAllText("../Data/data.txt", data);
-            Console.WriteLine("Данные сохранены в Data/data.txt");
+            total += (g - 15);
         }
-
+        string line = $"{d:F1} {total / 5.0}";
+        text += line + "\n";
+        Console.WriteLine(line);
+    }
+    File.WriteAllText("Data/data.txt", text);
+    Console.WriteLine("Данные успешно сохранены в Data/data.txt");
+}
+        
         public static void SetupFromJson()
         {
             if (File.Exists("settings.json"))
