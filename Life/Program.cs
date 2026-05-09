@@ -7,6 +7,13 @@ using System.Threading;
 
 namespace cli_life
 {
+    public class Settings
+    {
+        public int Width { get; set; } = 50;
+        public int Height { get; set; } = 20;
+        public int CellSize { get; set; } = 1;
+        public double LiveDensity { get; set; } = 0.5;
+    }
     public class Cell
     {
         public bool IsAlive;
@@ -85,6 +92,60 @@ namespace cli_life
                 }
             }
         }
+        public void Save(string path)
+        {
+            string[] lines = new string[Rows];
+            for (int y = 0; y < Rows; y++)
+            {
+                string line = "";
+                for (int x = 0; x < Columns; x++)
+                    line += Cells[x, y].IsAlive ? "*" : " ";
+                lines[y] = line;
+            }
+            File.WriteAllLines(path, lines);
+        }
+
+        public void Load(string path)
+        {
+            if (!File.Exists(path)) return;
+            string[] lines = File.ReadAllLines(path);
+            for (int y = 0; y < Rows && y < lines.Length; y++)
+            {
+                for (int x = 0; x < Columns && x < lines[y].Length; x++)
+                {
+                    Cells[x, y].IsAlive = (lines[y][x] == '*');
+                }
+            }
+        }
+
+        public int CountClusters()
+        {
+            var visited = new HashSet<Cell>();
+            int clusters = 0;
+            foreach (var cell in Cells)
+            {
+                if (cell.IsAlive && !visited.Contains(cell))
+                {
+                    clusters++;
+                    var stack = new Stack<Cell>();
+                    stack.Push(cell);
+                    visited.Add(cell);
+                    while (stack.Count > 0)
+                    {
+                        var c = stack.Pop();
+                        foreach (var n in c.neighbors)
+                        {
+                            if (n.IsAlive && !visited.Contains(n))
+                            {
+                                visited.Add(n);
+                                stack.Push(n);
+                            }
+                        }
+                    }
+                }
+            }
+            return clusters;
+        }
     }
     class Program
     {
@@ -116,13 +177,79 @@ namespace cli_life
                 Console.Write('\n');
             }
         }
+
+        public static void RunResearch()
+        {
+            Directory.CreateDirectory("../Data");
+            string data = "";
+
+            for (double density = 0.1; density <= 0.9; density += 0.1)
+            {
+                int totalGenerations = 0;
+                int attempts = 5;
+
+                for (int a = 0; a < attempts; a++)
+                {
+                    Board b = new Board(50, 20, 1, density);
+                    int gens = 0;
+                    int sameCount = 0;
+                    int lastAlive = 0;
+
+                    while (sameCount < 15 && gens < 1000)
+                    {
+                        b.Advance();
+                        int currentAlive = 0;
+                        foreach (var cell in b.Cells) if (cell.IsAlive) currentAlive++;
+                        
+                        if (currentAlive == lastAlive) sameCount++;
+                        else sameCount = 0;
+
+                        lastAlive = currentAlive;
+                        gens++;
+                    }
+                    totalGenerations += (gens - 15);
+                }
+                data += $"{density:F1} {totalGenerations / (double)attempts}\n";
+                Console.WriteLine($"Плотность {density:F1}: {totalGenerations / (double)attempts} пок.");
+            }
+            File.WriteAllText("../Data/data.txt", data);
+            Console.WriteLine("Данные сохранены в Data/data.txt");
+        }
+
+        public static void SetupFromJson()
+        {
+            if (File.Exists("settings.json"))
+            {
+                string json = File.ReadAllText("settings.json");
+                Settings s = JsonSerializer.Deserialize<Settings>(json);
+                board = new Board(s.Width, s.Height, s.CellSize, s.LiveDensity);
+            }
+            if (File.Exists("figure.txt"))
+            {
+                board.Load("figure.txt");
+            }
+        }
+
+        public static void PrintStats()
+        {
+            int alive = 0;
+            foreach (var cell in board.Cells) if (cell.IsAlive) alive++;
+            Console.WriteLine($"Живых: {alive}, Групп (комбинаций): {board.CountClusters()}");
+            Console.WriteLine("Наблюдаемые фигуры: Блок, Улей, Лодка и др.");
+            board.Save("state_backup.txt");
+        }
+        
         static void Main(string[] args)
         {
+            Console.WriteLine("Нажмите 2 для исследования или Enter для обычной игры:");
+            if (Console.ReadLine() == "2") { RunResearch(); return; }
             Reset();
+            SetupFromJson();
             while(true)
             {
                 Console.Clear();
                 Render();
+                PrintStats();
                 board.Advance();
                 Thread.Sleep(1000);
             }
